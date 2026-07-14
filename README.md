@@ -17,35 +17,65 @@ npm install -g @53able/claude-profile-cli
 npm install -g github:53able/claude-profile-cli
 ```
 
+ローカル開発時はリポジトリ直下で:
+
+```sh
+npm install -g .
+```
+
 ## コマンド
+
+メインエントリは `claude-profile` です。サブコマンドで操作します。
 
 | コマンド | 役割 |
 |---|---|
-| `claude-profile-setup <profile>` | 新規プロファイルを作成し、トークンを発行・保存する |
-| `claude-profile-list` | プロファイル一覧とセットアップ状態を表示する |
-| `claude-profile-remove [profile]` | プロファイルを削除する(省略時は対話選択) |
-| `ccp [profile] [claude args...]` | 指定プロファイルとして `claude` を起動する(省略時は対話選択) |
+| `claude-profile setup <profile>` | 新規プロファイルを作成し、トークンを発行・保存する |
+| `claude-profile list` | プロファイル一覧とセットアップ状態を表示する |
+| `claude-profile remove [profile]` | プロファイルを削除する (省略時は対話選択) |
+| `claude-profile run [profile] [claude args...]` | 指定プロファイルとして `claude` を起動する (省略時は対話選択) |
+
+### ヘルプ・バージョン
+
+```sh
+claude-profile              # 全体ヘルプ (バージョン付き)
+claude-profile --help
+claude-profile --version
+claude-profile help setup   # コマンド別ヘルプ
+claude-profile-list --help  # 各コマンドでも同様
+```
+
+### レガシーコマンド
+
+従来のコマンド名もそのまま使えます (挙動は同一)。
+
+| コマンド | 対応するサブコマンド |
+|---|---|
+| `claude-profile-setup <profile>` | `claude-profile setup <profile>` |
+| `claude-profile-list` | `claude-profile list` |
+| `claude-profile-remove [profile]` | `claude-profile remove [profile]` |
+| `ccp [profile] [claude args...]` | `claude-profile run [profile] [claude args...]` |
 
 ## 使い方
 
 ```sh
-# 新しいプロファイルを作成(ブラウザでの認証 → トークン貼り付け)
-claude-profile-setup work
+# 新しいプロファイルを作成 (ブラウザでの認証 → トークン貼り付け)
+claude-profile setup work
 
 # プロファイル一覧を確認
-claude-profile-list
+claude-profile list
 
 # プロファイルを指定して起動
-ccp work
+claude-profile run work
+ccp work                    # ショートカット
 
 # プロファイル名を省略すると対話選択
 ccp
 
-# プロファイルを削除(対話選択 + 確認あり)
-claude-profile-remove
+# プロファイルを削除 (対話選択 + 確認あり)
+claude-profile remove
 ```
 
-各プロファイルの設定・トークンは `~/.claude-profiles/<profile>/` 以下に保存されます(`CLAUDE_PROFILES_DIR` 環境変数で変更可能)。
+各プロファイルの設定・トークンは `~/.claude-profiles/<profile>/` 以下に保存されます (`CLAUDE_PROFILES_DIR` 環境変数で変更可能)。
 
 ## ライセンス
 
