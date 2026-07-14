@@ -1,12 +1,14 @@
-'use strict';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import prompts from 'prompts';
+import { version } from '../package.json';
+import { pickProfile } from './pick-profile';
+import { promptHidden } from './prompt-hidden';
+import { configDir, listProfiles, profileBase, profilesDir, tokenPath } from './profiles';
+import { moduleLogger, setupLogging } from './logging';
+import { CommandKeySchema, type CommandKey } from './schemas';
 
-const fs = require('fs');
-const { spawnSync } = require('child_process');
-const prompts = require('prompts');
-const { version } = require('../package.json');
-const { profilesDir, profileBase, tokenPath, configDir, listProfiles } = require('./profiles');
-const { pickProfile } = require('./pick-profile');
-const { promptHidden } = require('./prompt-hidden');
+const log = moduleLogger('cli');
 
 const META_FLAGS = new Set(['--help', '-h', '--version', '-V']);
 
@@ -14,16 +16,27 @@ const OPTIONS_TEXT = `Options:
   -h, --help      ヘルプを表示
   -V, --version   バージョンを表示`;
 
-const splitCcpArgs = (argv) => {
+type SplitRunArgs = {
+  profileArg: string | undefined;
+  claudeArgs: string[];
+};
+
+/** `run` 用: 第1引数がプロファイル名か claude 引数かを分離 */
+const splitRunArgs = (argv: string[]): SplitRunArgs => {
   const hasProfile = argv.length > 0 && !argv[0].startsWith('-');
   return hasProfile
     ? { profileArg: argv[0], claudeArgs: argv.slice(1) }
     : { profileArg: undefined, claudeArgs: argv };
 };
 
-const COMMANDS = {
+type CommandSpec = {
+  usage: string;
+  summary: string;
+  run: (argv: string[]) => Promise<void>;
+};
+
+const COMMANDS: Record<CommandKey, CommandSpec> = {
   setup: {
-    names: ['setup', 'claude-profile-setup'],
     usage: 'claude-profile setup <profile>',
     summary: '新規プロファイルを作成し、トークンを発行・保存する',
     run: async (argv) => {
@@ -46,12 +59,14 @@ const COMMANDS = {
 
       const result = spawnSync('claude', ['setup-token'], { stdio: 'inherit' });
       if (result.status !== 0) {
+        log.error('claude setup-token failed', { profile, status: result.status });
         console.error('claude setup-token が失敗しました。');
         process.exit(result.status ?? 1);
       }
 
       const token = await promptHidden('トークンを貼り付けて Enter を押してください: ');
       if (!token) {
+        log.error('empty token on setup', { profile });
         console.error('トークンが空です。中断しました。');
         process.exit(1);
       }
@@ -60,12 +75,13 @@ const COMMANDS = {
       fs.writeFileSync(file, token, { mode: 0o600 });
       fs.chmodSync(file, 0o600);
 
+      log.info('profile token saved', { profile, file });
+
       console.log(`保存しました: ${file}`);
-      console.log(`次から 'ccp ${profile}' でこのプロファイルとして claude を起動できます。`);
+      console.log(`次から 'claude-profile run ${profile}' でこのプロファイルとして claude を起動できます。`);
     },
   },
   list: {
-    names: ['list', 'claude-profile-list'],
     usage: 'claude-profile list',
     summary: 'プロファイル一覧とセットアップ状態を表示する',
     run: async () => {
@@ -83,7 +99,6 @@ const COMMANDS = {
     },
   },
   remove: {
-    names: ['remove', 'claude-profile-remove'],
     usage: 'claude-profile remove [profile]',
     summary: 'プロファイルを削除する (profile 省略時は対話選択)',
     run: async (argv) => {
@@ -95,6 +110,7 @@ const COMMANDS = {
 
       const base = profileBase(profile);
       if (!fs.existsSync(base)) {
+        log.error('profile not found for remove', { profile, available: listProfiles() });
         console.error(`Profile '${profile}' は存在しません。`);
         console.error(`Available profiles: ${listProfiles().join(' ')}`);
         process.exit(1);
@@ -111,31 +127,34 @@ const COMMANDS = {
       );
 
       if (!confirmed) {
+        log.info('profile remove cancelled', { profile });
         console.log('中断しました。');
         return;
       }
 
       fs.rmSync(base, { recursive: true, force: true });
+      log.info('profile removed', { profile, base });
       console.log(`削除しました: ${base}`);
     },
   },
   run: {
-    names: ['run', 'ccp'],
     usage: 'claude-profile run [profile] [claude args...]',
     summary: '指定プロファイルとして claude を起動する (profile 省略時は対話選択)',
     run: async (argv) => {
-      const { profileArg, claudeArgs } = splitCcpArgs(argv);
+      const { profileArg, claudeArgs } = splitRunArgs(argv);
       const profile =
-        profileArg ||
+        profileArg ??
         (await pickProfile({ message: 'ログインするプロファイルを選択してください', onlyReady: true }));
 
       const file = tokenPath(profile);
       if (!fs.existsSync(file)) {
+        log.error('profile not set up for run', { profile });
         console.error(`Profile '${profile}' is not set up yet. Run: claude-profile setup ${profile}`);
         process.exit(1);
       }
 
       const token = fs.readFileSync(file, 'utf8').trim();
+      log.info('launching claude', { profile, configDir: configDir(profile), args: claudeArgs });
       const result = spawnSync('claude', claudeArgs, {
         stdio: 'inherit',
         env: {
@@ -150,22 +169,21 @@ const COMMANDS = {
   },
 };
 
-const COMMAND_BY_NAME = Object.fromEntries(
-  Object.entries(COMMANDS).flatMap(([key, spec]) => spec.names.map((name) => [name, key]))
-);
+/** `--help` / `--version` などメタ引数か */
+export const isMetaRequest = (argv: string[]): boolean => argv.length > 0 && META_FLAGS.has(argv[0]);
 
-const isMetaRequest = (argv) => argv.length > 0 && META_FLAGS.has(argv[0]);
+/** コマンド名を検証して返す。不明なら `undefined` */
+export const resolveCommandKey = (name: string): CommandKey | undefined => {
+  const parsed = CommandKeySchema.safeParse(name);
+  return parsed.success ? parsed.data : undefined;
+};
 
-const resolveCommandKey = (name) => (name ? COMMAND_BY_NAME[name] : undefined);
-
-const printVersion = () => {
+const printVersion = (): void => {
   console.log(version);
 };
 
-const printCommandHelp = (commandKey) => {
+const printCommandHelp = (commandKey: CommandKey): void => {
   const spec = COMMANDS[commandKey];
-  if (!spec) failUnknown(commandKey);
-
   console.log(`${spec.usage}
 
 ${spec.summary}
@@ -174,8 +192,10 @@ ${OPTIONS_TEXT}
 `);
 };
 
-const printRootHelp = () => {
-  const lines = Object.values(COMMANDS).map((spec) => `  ${spec.usage.padEnd(44)} ${spec.summary}`);
+const printRootHelp = (): void => {
+  const lines = Object.entries(COMMANDS).map(
+    ([, spec]) => `  ${spec.usage.padEnd(44)} ${spec.summary}`
+  );
   console.log(`claude-profile-cli ${version}
 
 Usage:
@@ -187,40 +207,33 @@ Commands:
 ${lines.join('\n')}
 
 ${OPTIONS_TEXT}
-
-Legacy commands (same behavior):
-  claude-profile-setup, claude-profile-list, claude-profile-remove, ccp
 `);
 };
 
-const handleMetaArgs = (argv, commandKey) => {
+const handleMetaArgs = (argv: string[]): boolean => {
   if (!isMetaRequest(argv)) return false;
   if (argv[0] === '--version' || argv[0] === '-V') printVersion();
-  else if (commandKey) printCommandHelp(commandKey);
   else printRootHelp();
   return true;
 };
 
-const failUnknown = (name) => {
+const failUnknown = (name: string): never => {
+  log.error('unknown command', { command: name });
   console.error(`Unknown command: ${name}`);
   console.error(`Run 'claude-profile help' for usage.`);
   process.exit(1);
+  throw new Error('unreachable');
 };
 
-const runCommand = async (commandKey, argv) => {
+const runCommand = async (commandKey: CommandKey, argv: string[]): Promise<void> => {
   await COMMANDS[commandKey].run(argv);
 };
 
-/** legacy bin エントリ用: claude-profile-setup 等 */
-const runEntry = async (commandKey) => {
+/** CLI エントリポイント */
+export const runMain = async (): Promise<void> => {
+  setupLogging();
   const argv = process.argv.slice(2);
-  if (handleMetaArgs(argv, commandKey)) return;
-  await runCommand(commandKey, argv);
-};
-
-/** claude-profile メインエントリ用 */
-const runMain = async () => {
-  const argv = process.argv.slice(2);
+  log.debug('argv parsed', { argv });
   if (handleMetaArgs(argv)) return;
 
   const [command, ...rest] = argv;
@@ -230,27 +243,20 @@ const runMain = async () => {
   }
 
   if (command === 'help') {
-    const key = resolveCommandKey(rest[0]);
+    const key = resolveCommandKey(rest[0] ?? '');
     if (rest[0] && !key) failUnknown(rest[0]);
     if (key) printCommandHelp(key);
     else printRootHelp();
     return;
   }
 
-  const key = resolveCommandKey(command);
-  if (!key) failUnknown(command);
-  await runCommand(key, rest);
+  const maybeKey = resolveCommandKey(command);
+  if (maybeKey) {
+    log.debug('command resolved', { command: maybeKey });
+    await runCommand(maybeKey, rest);
+    return;
+  }
+  failUnknown(command);
 };
 
-module.exports = { runEntry, runMain, COMMANDS, resolveCommandKey, isMetaRequest };
-
-// node lib/cli.js
-if (require.main === module) {
-  const assert = require('assert');
-  assert.strictEqual(isMetaRequest(['--help']), true);
-  assert.strictEqual(isMetaRequest(['work', '--help']), false);
-  assert.strictEqual(resolveCommandKey('ccp'), 'run');
-  assert.strictEqual(resolveCommandKey('claude-profile-list'), 'list');
-  assert.strictEqual(resolveCommandKey('nope'), undefined);
-  console.log('ok');
-}
+export { COMMANDS };
