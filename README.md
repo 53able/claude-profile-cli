@@ -39,7 +39,9 @@ npm install -g .
 ```sh
 claude-profile              # 全体ヘルプ (バージョン付き)
 claude-profile --help
+claude-profile -h
 claude-profile --version
+claude-profile -V
 claude-profile help setup   # コマンド別ヘルプ
 ```
 
@@ -63,6 +65,8 @@ claude-profile remove
 ```
 
 各プロファイルの設定・トークンは `~/.claude-profiles/<profile>/` 以下に保存されます (`CLAUDE_PROFILES_DIR` 環境変数で変更可能)。
+
+プロファイル名は英字または数字で始まり、英数字・`.`・`_`・`-` のみ使用できます (例: `work`, `my-profile`)。詳細は [SPEC.md](./SPEC.md) を参照してください。
 
 ## ライセンス
 
