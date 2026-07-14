@@ -4,7 +4,14 @@ import prompts from 'prompts';
 import { version } from '../package.json';
 import { pickProfile } from './pick-profile';
 import { promptHidden } from './prompt-hidden';
-import { configDir, listProfiles, profileBase, profilesDir, tokenPath } from './profiles';
+import {
+  configDir,
+  listProfiles,
+  ProfileValidationError,
+  profileBase,
+  profilesDir,
+  tokenPath,
+} from './profiles';
 import { moduleLogger, setupLogging } from './logging';
 import { CommandKeySchema, type CommandKey } from './schemas';
 
@@ -19,6 +26,19 @@ const OPTIONS_TEXT = `Options:
 type SplitRunArgs = {
   profileArg: string | undefined;
   claudeArgs: string[];
+};
+
+/** プロファイル名を検証してベースパスを返す。不正ならメッセージを出して終了する */
+const requireProfileBase = (profile: string): string => {
+  try {
+    return profileBase(profile);
+  } catch (error) {
+    if (error instanceof ProfileValidationError) {
+      console.error(error.message);
+      process.exit(1);
+    }
+    throw error;
+  }
 };
 
 /** `run` 用: 第1引数がプロファイル名か claude 引数かを分離 */
@@ -47,7 +67,7 @@ const COMMANDS: Record<CommandKey, CommandSpec> = {
         process.exit(1);
       }
 
-      const base = profileBase(profile);
+      const base = requireProfileBase(profile);
       fs.mkdirSync(configDir(profile), { recursive: true });
       fs.chmodSync(profilesDir(), 0o700);
       fs.chmodSync(base, 0o700);
@@ -108,7 +128,7 @@ const COMMANDS: Record<CommandKey, CommandSpec> = {
         ? arg
         : await pickProfile({ message: '削除するプロファイルを選択してください' });
 
-      const base = profileBase(profile);
+      const base = requireProfileBase(profile);
       if (!fs.existsSync(base)) {
         log.error('profile not found for remove', { profile, available: listProfiles() });
         console.error(`Profile '${profile}' は存在しません。`);
@@ -146,6 +166,7 @@ const COMMANDS: Record<CommandKey, CommandSpec> = {
         profileArg ??
         (await pickProfile({ message: 'ログインするプロファイルを選択してください', onlyReady: true }));
 
+      requireProfileBase(profile);
       const file = tokenPath(profile);
       if (!fs.existsSync(file)) {
         log.error('profile not set up for run', { profile });

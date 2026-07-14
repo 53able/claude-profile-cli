@@ -99,6 +99,18 @@ describe('claude-profile setup (CLI)', () => {
     });
   });
 
+  test('無効なプロファイル名は拒否する', () => {
+    withTempProfilesDir((dir) => {
+      const invalidCases = ['../evil', 'foo/bar', '.hidden', ''];
+      for (const name of invalidCases) {
+        const args = name === '' ? ['setup'] : ['setup', name];
+        const result = runCli(args, { profilesRoot: dir });
+        assert.equal(result.status, 1, `expected failure for profile name: ${JSON.stringify(name)}`);
+      }
+      assert.equal(fs.readdirSync(dir).length, 0);
+    });
+  });
+
   test('トークン保存時に config/token のパーミッションを設定する', () => {
     withTempProfilesDir((dir) => {
       withFakeClaude(0, (binDir) => {
