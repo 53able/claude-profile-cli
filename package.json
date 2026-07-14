@@ -10,7 +10,7 @@
     "oauth"
   ],
   "license": "MIT",
-  "author": "tadano-go",
+  "author": "53able",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/53able/claude-profile-cli.git"
