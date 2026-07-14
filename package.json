@@ -16,6 +16,7 @@
     "url": "git+https://github.com/53able/claude-profile-cli.git"
   },
   "bin": {
+    "claude-profile": "bin/claude-profile.js",
     "claude-profile-setup": "bin/claude-profile-setup.js",
     "claude-profile-list": "bin/claude-profile-list.js",
     "claude-profile-remove": "bin/claude-profile-remove.js",
