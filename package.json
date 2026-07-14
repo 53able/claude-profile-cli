@@ -1,6 +1,6 @@
 {
   "name": "@53able/claude-profile-cli",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Manage multiple Claude Code account profiles (setup-token + launch).",
   "keywords": [
     "claude",
@@ -10,21 +10,23 @@
     "oauth"
   ],
   "license": "MIT",
-  "author": "tadano-go",
+  "author": "53able",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/53able/claude-profile-cli.git"
   },
   "bin": {
-    "claude-profile-setup": "bin/claude-profile-setup.js",
-    "claude-profile-list": "bin/claude-profile-list.js",
-    "claude-profile-remove": "bin/claude-profile-remove.js",
-    "ccp": "bin/ccp.js"
+    "claude-profile": "bin/claude-profile.js"
   },
   "files": [
     "bin",
     "lib"
   ],
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build",
+    "typecheck": "tsc --noEmit"
+  },
   "engines": {
     "node": ">=18"
   },
@@ -32,6 +34,12 @@
     "access": "public"
   },
   "dependencies": {
-    "prompts": "^2.4.2"
+    "@logtape/logtape": "^2.2.4",
+    "prompts": "^2.4.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "^7.0.2"
   }
 }

@@ -1,0 +1,73 @@
+name: Publish npm
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - package.json
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      PACKAGE_NAME: '@53able/claude-profile-cli'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Read version
+        id: pkg
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Detect version bump
+        id: bump
+        run: |
+          PREV=$(git show HEAD~1:package.json 2>/dev/null | jq -r .version || echo "")
+          CURR="${{ steps.pkg.outputs.version }}"
+          if [ "$PREV" = "$CURR" ]; then
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+            echo "Version unchanged ($CURR)"
+          else
+            echo "bumped=true" >> "$GITHUB_OUTPUT"
+            echo "Version bumped: ${PREV:-<none>} -> $CURR"
+          fi
+
+      - name: Skip if already on npm
+        id: registry
+        if: steps.bump.outputs.bumped == 'true'
+        run: |
+          VERSION="${{ steps.pkg.outputs.version }}"
+          if npm view "$PACKAGE_NAME@$VERSION" version 2>/dev/null; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "Already published: $PACKAGE_NAME@$VERSION"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "Not yet published: $PACKAGE_NAME@$VERSION"
+          fi
+
+      - name: Install dependencies
+        if: steps.bump.outputs.bumped == 'true' && steps.registry.outputs.publish == 'true'
+        run: npm ci
+
+      - name: Build
+        if: steps.bump.outputs.bumped == 'true' && steps.registry.outputs.publish == 'true'
+        run: npm run build
+
+      - name: Typecheck
+        if: steps.bump.outputs.bumped == 'true' && steps.registry.outputs.publish == 'true'
+        run: npm run typecheck
+
+      - name: Publish to npm
+        if: steps.bump.outputs.bumped == 'true' && steps.registry.outputs.publish == 'true'
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
