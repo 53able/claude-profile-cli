@@ -1,0 +1,18 @@
+{
+  "name": "claude-profile-cli",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Manage multiple Claude Code account profiles (setup-token + launch).",
+  "bin": {
+    "claude-profile-setup": "./bin/claude-profile-setup.js",
+    "claude-profile-list": "./bin/claude-profile-list.js",
+    "claude-profile-remove": "./bin/claude-profile-remove.js",
+    "ccp": "./bin/ccp.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "prompts": "^2.4.2"
+  }
+}
