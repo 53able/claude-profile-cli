@@ -25,7 +25,7 @@ npm install -g .
 
 ## コマンド
 
-メインエントリは `claude-profile` です。サブコマンドで操作します。
+`claude-profile` のサブコマンドで操作します。
 
 | コマンド | 役割 |
 |---|---|
@@ -41,19 +41,7 @@ claude-profile              # 全体ヘルプ (バージョン付き)
 claude-profile --help
 claude-profile --version
 claude-profile help setup   # コマンド別ヘルプ
-claude-profile-list --help  # 各コマンドでも同様
 ```
-
-### レガシーコマンド
-
-従来のコマンド名もそのまま使えます (挙動は同一)。
-
-| コマンド | 対応するサブコマンド |
-|---|---|
-| `claude-profile-setup <profile>` | `claude-profile setup <profile>` |
-| `claude-profile-list` | `claude-profile list` |
-| `claude-profile-remove [profile]` | `claude-profile remove [profile]` |
-| `ccp [profile] [claude args...]` | `claude-profile run [profile] [claude args...]` |
 
 ## 使い方
 
@@ -66,10 +54,9 @@ claude-profile list
 
 # プロファイルを指定して起動
 claude-profile run work
-ccp work                    # ショートカット
 
 # プロファイル名を省略すると対話選択
-ccp
+claude-profile run
 
 # プロファイルを削除 (対話選択 + 確認あり)
 claude-profile remove
