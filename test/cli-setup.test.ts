@@ -99,6 +99,35 @@ describe('claude-profile setup (CLI)', () => {
     });
   });
 
+  test('無効なプロファイル名は拒否し理由を表示する', () => {
+    withTempProfilesDir((dir) => {
+      const cases = [
+        { name: '../evil', reason: /`\.\.` は使えません/ },
+        { name: 'foo/bar', reason: /スラッシュ/ },
+        { name: '.hidden', reason: /ドット \(.\) で始める/ },
+        { name: 'bad@name', reason: /使えない文字が含まれています/ },
+      ] as const;
+
+      for (const { name, reason } of cases) {
+        const result = runCli(['setup', name], { profilesRoot: dir });
+        assert.equal(result.status, 1, `expected failure for profile name: ${name}`);
+        assert.match(result.stderr, /無効なプロファイル名です/, name);
+        assert.match(result.stderr, reason, name);
+        assert.match(result.stderr, /例: work, my-profile/, name);
+      }
+      assert.equal(fs.readdirSync(dir).length, 0);
+    });
+  });
+
+  test('無効なプロファイル名時に既存プロファイルを案内する', () => {
+    withTempProfilesDir((dir) => {
+      fs.mkdirSync(path.join(dir, 'work'));
+      const result = runCli(['setup', '../evil'], { profilesRoot: dir });
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /既存のプロファイル: work/);
+    });
+  });
+
   test('トークン保存時に config/token のパーミッションを設定する', () => {
     withTempProfilesDir((dir) => {
       withFakeClaude(0, (binDir) => {

@@ -4,6 +4,15 @@ import { z } from 'zod';
 export const CommandKeySchema = z.enum(['setup', 'list', 'remove', 'run']);
 export type CommandKey = z.infer<typeof CommandKeySchema>;
 
+/**
+ * プロファイル名。
+ * 英字または数字で始まり、英数字・`.`・`_`・`-` のみ許可する。
+ */
+export const ProfileNameSchema = z
+  .string()
+  .regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/, 'invalid profile name');
+export type ProfileName = z.infer<typeof ProfileNameSchema>;
+
 /** `pickProfile` のオプション */
 export const PickProfileOptionsSchema = z.object({
   message: z.string().optional(),
